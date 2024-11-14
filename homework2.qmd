@@ -1,0 +1,134 @@
+---
+title: "Plan372-2"
+format: pdf
+---
+
+```{r}
+library(tidyverse)
+library(lubridate)
+library(ggthemes)
+```
+
+load the data from CSV.
+
+```{r}
+
+data = read.csv("Fire_Incidents (1).csv")
+data #load in the data
+```
+
+1.  How long does it take Wake County Fire to respond to incidents, on average
+
+```{r}
+data$arrive_date_time = ymd_hms(data$arrive_date_time) #convert the arrive_date_time variable to a date time format to be able to do calculations
+data$dispatch_date_time = ymd_hms(data$dispatch_date_time) #convert the dispatch_date_time variable to a date time format to be able to do calculations
+data$response = data$arrive_date_time - data$dispatch_date_time
+mean(data$response, na.rm = T) #subtract the dispatch time from the arrival time to find the response time. make this a new column in the data set. then calculate the mean of this new variable, response to find the average response of all the calls in the data set
+
+```
+
+It takes Wake County Fire 318.7497 secs to respond to an incident, on average.
+
+2.  Does this response time vary by station? What stations have the highest and lowest average response times?
+
+```{r}
+average = data |> #create a new data set called average, from the original data set
+  group_by(station) |> #group by station to find the average response at each station 
+  summarize(average_response = mean(response, na.rm = T)) |> #create the variable average_response which is the avergae time it takes a station to respond.
+  ungroup() |>
+  arrange(average_response) #arrange the avergae response variable to go from shortest response time to longest response time
+
+average #resulting in a new data set called average that contains the columns average_response and station which gives the average response time of each station
+```
+
+Response time does vary by station, shown in the table above. Station 13 has the lowest average response time with a time of 223 seconds. Station 29 has the highest average response time with a time of 495.764 seconds.
+
+3.  Have Wake County Fire's response times been going up or down over time? What might be the reason for these changes?
+
+```{r}
+data$year = floor_date(data$arrive_date_time, unit = "year") #take just the year from the arrive_date_time variable and round down to the beginning of the year using the floor_date to give a round year. add this column to the original data set and call it year. 
+responses_through_years = data |> # create new data set called responses_through_years that uses the original data set 
+  group_by(year) |> #group the data by the newly defined year variable 
+  summarize(average_response = mean(response, na.rm = T)) #calculate the average response time per year
+
+ggplot(responses_through_years, aes(x = year, y = average_response)) +
+  geom_line() #plot the new data set to clearly depicts the trends in response times over the years. put the year on the x axis and the average response time on the y axis
+```
+The line graph displays that from 2007 to about 2017 the average response time was pretty much the same, varrying just a little bit from year to year. In 2019 the response time was the slowest it had been in over 10 years by a significant amount. This could have been due to a shortage of firefighters. Since then, there has been a sharp decline in response time over the past 4 years, beginning around 2019. This is most likely due to an increase in technology which aids in efficiency and quickness. 
+
+4.  At what times of day are fire calls most likely to occur?
+
+```{r}
+data$time = hour(data$dispatch_date_time) #take just the time from the dispatch_date_time variable using the hour function. add this column to the original data set and call it hour
+
+by_time = data |> # create new data set called by_time that uses the original data set 
+  group_by(time) |> #group the data by what time the fire department was called 
+  count(time) #use the count function to sum how many calls happened each hour of the day 
+
+ggplot(by_time, aes(x = time, y=n)) +
+  geom_line() #plot the new data set to clearly depict which hours of the day had the most calls, putting the time on the x axis and the number of calls on the y axis 
+```
+Calls to the Fire Department occur most frequently from 3pm to 12am, peaking at about 10pm. These trends are displayed in the line graph above. 
+
+5.  How many calls to Wake County Fire are recorded in this dataset, and how many of them are actual fires?
+
+```{r}
+actually_fires= data|> # create new data set called actually_fires that uses the original data set
+  filter(incident_type >= 100 & incident_type <= 199) #filter to only include incident types with the code between 100-199. this is because actual fires are all coded as 100 and something dependeing on what type of fire it is. 
+
+nrow(actually_fires)  #find the number of calls made regarding a fire incident by getting the total number of rows in the newly defined actually_fires data set  
+nrow(data) #find the number of calls made by getting the total number of rows in the original data set 
+```
+There were 229,047 total calls in this data set with 17,231 of them having to do with a fire incident. 
+
+6.  It is reasonable that firefighters might respond more quickly to some types of incidents than others. Evaluate the average response time to actual fires. Is this response faster than the average response time for all incidents?
+
+```{r}
+mean(actually_fires$response, na.rm = T) #find the average response time of when the call was regarding a fire incident. make sure to take out the NA's as there are some present 
+mean(data$response, na.rm = T) #find the average response time all of incidents. make sure to take out the NA's as there are some present 
+sum((mean(data$response, na.rm = T)) - (mean(actually_fires$response, na.rm = T))) #subtract the average response time of all incident to the average response time of just fire incidents to find how much faster they responded to fire incidents on average.
+```
+The average response time for a call regarding a fire incident is 310.9837 seconds on average. This is 7.765917 seconds faster than the average response times for a call regarding any incident. 
+
+7.  Repeat the analysis for questions 2-4 for actual fires, rather than all incidents.
+
+```{r}
+#for this entire question I just copied my code from questions 2-4 but just replaced the original data set with the actualy_fires data set.
+average_fire = actually_fires |>
+  group_by(station) |>
+  summarize(average_fire_response = mean(response, na.rm = T)) |>
+  ungroup()
+average_fire
+```
+
+```{r}
+min_fire_station = average_fire |>
+  filter(average_fire_response == min(average_fire_response))
+min_fire_station
+```
+
+```{r}
+max_fire_station = average_fire |>
+  filter(average_fire_response == max(average_fire_response))
+max_fire_station
+```
+
+```{r}
+actually_fires$year = floor_date(actually_fires$arrive_date_time, unit = "year")
+responses_through_years_fire = actually_fires |>
+  group_by(year) |>
+  summarize(average_response = mean(response, na.rm = T)) 
+ggplot(responses_through_years_fire, aes(x = year, y = average_response)) +
+  geom_line()
+```
+
+```{r}
+actually_fires$time = hour(actually_fires$dispatch_date_time)
+
+by_time_fire = actually_fires |>
+  group_by(time) |>
+  count(time)
+
+ggplot(by_time_fire, aes(x = time, y=n)) +
+  geom_col()
+```
